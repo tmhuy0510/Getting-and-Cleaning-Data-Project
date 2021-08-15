@@ -1,0 +1,220 @@
+---
+title: "run_analysis"
+author: "Henry Truong"
+date: "15/08/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# "Getting and Cleaning Data" Project
+
+## Task 1: Merging Data from Training Set and Test Set
+
+### Import library
+
+```{r eval=FALSE}
+library(tidyr)
+library(dplyr)
+```
+
+### Download Project Data
+
+**Create file directory for project data**
+```{r}
+if(!file.exists("Project Data")) {dir.create("Project Data")}
+```
+
+**Set current working directory**
+```{r eval=FALSE}
+myDir = "./Project Data"
+setwd(myDir)
+```
+
+**Download zip file which is dataset for project**
+```{r eval=FALSE}
+myUrl = "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+myDest = "./myData.zip"
+download.file(myUrl, myDest)
+```
+
+**Unzip downloaded zip file**
+```{r eval=FALSE}
+unzip(myDest)
+```
+
+**Set new current working directory**
+This step makes codes for importing data somewhat shorter
+```{r eval=FALSE}
+myDir = "./UCI HAR Dataset"
+setwd(myDir)
+```
+
+### Import Project Data into RStudio
+
+#### Import Training Dataset
+
+**Read training data on variables X**
+```{r eval=FALSE}
+myTrainDataX = read.table("./train/X_train.txt")
+```
+
+**Read training data on label y**
+```{r eval=FALSE}
+myTrainDatay = read.table("./train/y_train.txt")
+```
+
+**Read training data on volunteer sub**
+```{r eval=FALSE}
+myTrainSub = read.table("./train/subject_train.txt")
+```
+
+#### Import Test Dataset
+
+**Read test data on variables X**
+```{r eval=FALSE}
+myTestDataX = read.table("./test/X_test.txt")
+```
+
+**Read test data on label y**
+```{r eval=FALSE}
+myTestDatay = read.table("./test/y_test.txt")
+```
+
+**Read test data on volunteer sub**
+```{r eval=FALSE}
+myTestSub = read.table("./test/subject_test.txt")
+```
+
+### Make training and test sets understandable
+
+**Add names of variables X to both training and test sets**
+```{r eval=FALSE}
+names(myTrainDataX) = read.table("./features.txt")[, 2]
+names(myTestDataX) = read.table("./features.txt")[, 2]
+```
+
+**Add name of label y to both training and test sets**
+```{r eval=FALSE}
+names(myTrainDatay) = "Activity"
+names(myTestDatay) = "Activity"
+```
+
+**Add name of volunteer sub to both training and test sets**
+```{r eval=FALSE}
+names(myTrainSub) = "VolunteerID"
+names(myTestSub) = "VolunteerID"
+```
+
+### Extract variables whose name contains mean() or std()
+
+**Create boolean vector which determines which variable names contains mean() or std()**
+```{r eval=FALSE}
+cond = grep("(mean\\(\\)|std\\(\\))", myVarNames)
+```
+
+**Extract required subsets from training and test sets**
+```{r eval=FALSE}
+myCompactTrainDataX = myTrainDataX[, cond]
+myCompactTestDataX = myTestDataX[, cond]
+```
+
+### Merge all data to get complete table
+
+**Merge all data in training set**
+```{r eval=FALSE}
+myMergedTrainData = cbind(myTrainSub, myCompactTrainDataX, myTrainDatay)
+```
+
+**Merge all data in test set**
+```{r eval=FALSE}
+myMergedTestData = cbind(myTestSub, myCompactTestDataX, myTestDatay)
+```
+
+**Merge training set and test set**
+```{r eval=FALSE}
+myMergedAllData = rbind(myMergedTrainData, myMergedTestData)
+```
+
+### Change labels of Activity from numbers (1, 2, ...) to literal words (WALKING, LAYING, ...)
+
+**Get literal words for Activity**
+```{r eval=FALSE}
+myActLable = read.table("./activity_labels.txt")[, 2]
+```
+
+**Change class of Activity to factor and Set new level**
+```{r eval=FALSE}
+myMergedAllData$Activity = as.factor(myMergedAllData$Activity)
+attributes(myMergedAllData$Activity)$levels = myActLable
+```
+
+### Other small changes
+
+**Change class of VolunteerID to factor**
+```{r eval=FALSE}
+myMergedAllData$VolunteerID = as.factor(myMergedAllData$VolunteerID)
+```
+
+**Complete Tast 1 with `myMergedAllData` being result**
+
+## Task 2: Creating table containing mean of variables based on VolunteerID and Activity
+
+### Merge VolunteerID and Activity into 1 column
+
+**Create new table using newly merged column and columns of variable in `myMergedAllData`**
+```{r eval=FALSE}
+myVolAct = paste(myMergedAllData$VolunteerID, myMergedAllData$Activity, sep = ".")
+myNewData = cbind(myVolAct, myMergedAllData[, -c(1, ncol(myMergedAllData))])
+```
+
+### Split `myNewData` based on its 1st column and Calculate mean of its variable
+
+**Create new table saving result of calculation applied to each group**
+```{r eval=FALSE}
+myTable = sapply(split(myNewData[, 2:ncol(myNewData)], myNewData[, 1]), colMeans)
+```
+
+### Convert result of calculation into data frame
+
+**Transpose myTable to get 30x66 matrix and convert result to data frame**
+```{r eval=FALSE}
+myTable = as.data.frame(t(myTable))
+```
+
+### Add col VolAct to `myTable` and Remove its row names
+
+**Add col VolAct using row names of `myTable`**
+```{r eval=FALSE}
+myTBL = cbind(VolAct = row.names(myTable), myTable)
+```
+
+**Remove `myTBL`'s row names**
+row.names(myTBL) = NULL
+
+### Separate "VolAct" col into "VolunteerID" and "Activity" cols
+
+**Use separate() function**
+```{r eval=FALSE}
+myTBL = separate(myTBL, VolAct, sep = "\\.", into = c("VolunteerID", "Activity"))
+```
+
+**Convert class of VolunteerID to numeric**
+```{r eval=FALSE}
+myTBL$VolunteerID = as.numeric(myTBL$VolunteerID)
+```
+
+**Arrange `myTBL` using VoluteerID column**
+```{r eval=FALSE}
+myTBL = arrange(myTBL, VolunteerID)
+```
+
+### Write result to txt file
+
+```{r eval=FALSE}
+write.table(myTBL, file = "../Project Result.txt", sep = ",", row.names = F, col.names = T)
+```
+
+**Complete Task 2 with *"Project Result.txt"* being result**
